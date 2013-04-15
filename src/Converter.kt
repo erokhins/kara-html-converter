@@ -39,7 +39,7 @@ object KaraHTMLConverter {
     fun converter(htmlText : String, startDepth : Int = 0): String {
         val str = StringBuilder()
         val doc = Jsoup.parse(htmlText)
-        NodeTraversor(KaraConvertNodeVisitor(str, 0)).traverse(doc)
+        NodeTraversor(KaraConvertNodeVisitor(str, startDepth - 1)).traverse(doc)         // -1 because root node is #document
         return str.toString()
     }
 
@@ -69,7 +69,7 @@ object KaraHTMLConverter {
         return " ".repeat(depth * DEPTH_SPACE_COUNT)
     }
 
-    private fun textConverter(text : String, depth :  Int): String {
+    private fun dataConverter(text : String, depth :  Int): String {
         val trimText = text.trim()
         if (trimText.isEmpty()) return ""
 
@@ -77,6 +77,18 @@ object KaraHTMLConverter {
         val str = StringBuilder()
         for (line in lines) {
             str.append(spaces(depth)).append(line.trim()).append('\n')
+        }
+        return str.toString()
+    }
+
+    private fun textConverter(text : String, depth :  Int): String {
+        val trimText = text.trim()
+        if (trimText.isEmpty()) return ""
+
+        val lines = trimText.split('\n')
+        val str = StringBuilder()
+        for (line in lines) {
+            str.append(spaces(depth)).append("+\"").append(line.trim()).append("\"\n")
         }
         return str.toString()
     }
@@ -109,15 +121,21 @@ object KaraHTMLConverter {
                 }
 
                 NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("/*\n")
-                        .append(textConverter(node.attr("comment")!!, realDepth + 1))
+                        .append(dataConverter(node.attr("comment")!!, realDepth + 1))
 
-                NodeType.data -> stringBuilder.append(textConverter(node.attr("data")!!, realDepth))
+                NodeType.data -> stringBuilder.append(spaces(realDepth)).append("\"\"\"\n")
+                        .append(dataConverter(node.attr("data")!!, realDepth + 1))
 
                 NodeType.element -> {
                     stringBuilder.append(spaces(realDepth)).append(node.nodeName())
                     val attrStr = attributesConverter(node.attributes()!!)
                     if (!attrStr.isEmpty()) stringBuilder.append('(').append(attrStr).append(')')
-                    stringBuilder.append(" {\n")
+
+                    if (node.childNodeSize() != 0) {
+                        stringBuilder.append(" {\n")
+                    } else {
+                        stringBuilder.append("\n")
+                    }
                 }
 
                 else -> throw IllegalStateException()
@@ -132,8 +150,10 @@ object KaraHTMLConverter {
 
                 NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("*/\n")
 
-                NodeType.data -> {}
-                NodeType.element -> stringBuilder.append(spaces(realDepth)).append("}\n")
+                NodeType.data -> stringBuilder.append(spaces(realDepth)).append("\"\"\"\n")
+                NodeType.element -> {
+                    if (node.childNodeSize() != 0) stringBuilder.append(spaces(realDepth)).append("}\n")
+                }
 
                 else -> throw IllegalStateException()
             }
