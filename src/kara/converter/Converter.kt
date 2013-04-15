@@ -8,39 +8,39 @@ import org.jsoup.select.NodeVisitor
 import org.jsoup.nodes.Node
 import org.jsoup.Jsoup
 import org.jsoup.select.NodeTraversor
+import kara.converter.NodeType.*
 import org.jsoup.nodes.Attributes
 
+enum class NodeType {
+    document
+    doctype
+    text
+    comment
+    data
+    element
+}
 
-
-object KaraHTMLConverter {
+public object KaraHTMLConverter {
     val DEPTH_SPACE_COUNT = 3
 
-    enum class NodeType {
-        document
-        doctype
-        text
-        comment
-        data
-        element
-    }
+
 
     private fun getNodeType(node : Node): NodeType {
-        val name = node.nodeName()!!
-        when {
-            name.equals("#document") -> return NodeType.document
-            name.equals("#doctype") -> return NodeType.doctype
-            name.equals("#text") -> return NodeType.text
-            name.equals("#comment") -> return NodeType.comment
-            name.equals("#data") -> return NodeType.data
-            else -> return NodeType.element
+        return when (node.nodeName()) {
+            "#document" -> document
+            "#doctype" -> doctype
+            "#text" -> text
+            "#comment" -> comment
+            "#data" -> data
+            else -> element
         }
     }
 
     private fun hasBodyTag(htmlText : String): Boolean {
-        return htmlText.contains("<body")
+        return htmlText.contains("<body ")
     }
 
-    fun converter(htmlText : String, startDepth : Int = 0): String {
+    public fun converter(htmlText : String, startDepth : Int = 0): String {
         val str = StringBuilder()
         if (hasBodyTag(htmlText)) {
             val doc = Jsoup.parse(htmlText)
@@ -120,24 +120,24 @@ object KaraHTMLConverter {
     }
 
 
-    class KaraConvertNodeVisitor(val stringBuilder : StringBuilder, val startDepth : Int) : NodeVisitor {
+    private class KaraConvertNodeVisitor(val stringBuilder : StringBuilder, val startDepth : Int) : NodeVisitor {
 
         public override fun head(node: Node?, depth: Int) {
             val realDepth = depth + startDepth
             when (getNodeType(node!!)) {
-                NodeType.document, NodeType.doctype -> {}
-                NodeType.text -> {
+                document, doctype -> {}
+                text -> {
                     val convertedText = textConverter(node.attr("text")!!, realDepth)
                     if (!convertedText.isEmpty()) stringBuilder.append(convertedText)
                 }
 
-                NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("/*\n")
+                comment -> stringBuilder.append(spaces(realDepth)).append("/*\n")
                         .append(dataConverter(node.attr("comment")!!, realDepth + 1))
 
-                NodeType.data -> stringBuilder.append(spaces(realDepth)).append("\"\"\"\n")
+                data -> stringBuilder.append(spaces(realDepth)).append("\"\"\"\n")
                         .append(dataConverter(node.attr("data")!!, realDepth + 1))
 
-                NodeType.element -> {
+                element -> {
                     stringBuilder.append(spaces(realDepth)).append(node.nodeName())
                     val attrStr = attributesConverter(node.attributes()!!)
                     if (!attrStr.isEmpty()) stringBuilder.append('(').append(attrStr).append(')')
@@ -156,13 +156,11 @@ object KaraHTMLConverter {
         public override fun tail(node: Node?, depth: Int) {
             val realDepth = depth + startDepth
             when (getNodeType(node!!)) {
-                NodeType.document, NodeType.doctype -> {}
-                NodeType.text -> {}
-
-                NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("*/\n")
-
-                NodeType.data -> stringBuilder.append(spaces(realDepth)).append("\"\"\"\n")
-                NodeType.element -> {
+                document, doctype -> {}
+                text -> {}
+                comment -> stringBuilder.append(spaces(realDepth)).append("*/\n")
+                data -> stringBuilder.append(spaces(realDepth)).append("\"\"\"\n")
+                element -> {
                     if (node.childNodeSize() != 0) stringBuilder.append(spaces(realDepth)).append("}\n")
                 }
 
