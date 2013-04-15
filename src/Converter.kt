@@ -70,7 +70,15 @@ object KaraHTMLConverter {
     }
 
     private fun textConverter(text : String, depth :  Int): String {
-        return text; //TODO:
+        val trimText = text.trim()
+        if (trimText.isEmpty()) return ""
+
+        val lines = trimText.split('\n')
+        val str = StringBuilder()
+        for (line in lines) {
+            str.append(spaces(depth)).append(line.trim()).append('\n')
+        }
+        return str.toString()
     }
 
     private fun attributesConverter(attributes : Attributes): String {
@@ -88,9 +96,6 @@ object KaraHTMLConverter {
         return str.toString()
     }
 
-    private fun tagConverter(tagNode : Node): String {
-        return ""
-    }
 
     class KaraConvertNodeVisitor(val stringBuilder : StringBuilder, val startDepth : Int) : NodeVisitor {
 
@@ -98,10 +103,13 @@ object KaraHTMLConverter {
             val realDepth = depth + startDepth
             when (getNodeType(node!!)) {
                 NodeType.document, NodeType.doctype -> {}
-                NodeType.text -> stringBuilder.append(textConverter(node.attr("text")!!, realDepth))
+                NodeType.text -> {
+                    val convertedText = textConverter(node.attr("text")!!, realDepth)
+                    if (!convertedText.isEmpty()) stringBuilder.append(convertedText)
+                }
 
                 NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("/*\n")
-                        .append(textConverter(node.attr("comment")!!, realDepth))
+                        .append(textConverter(node.attr("comment")!!, realDepth + 1))
 
                 NodeType.data -> stringBuilder.append(textConverter(node.attr("data")!!, realDepth))
 
@@ -120,11 +128,11 @@ object KaraHTMLConverter {
             val realDepth = depth + startDepth
             when (getNodeType(node!!)) {
                 NodeType.document, NodeType.doctype -> {}
-                NodeType.text -> stringBuilder.append("\n")
+                NodeType.text -> {}
 
-                NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("\n*/\n")
+                NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("*/\n")
 
-                NodeType.data -> stringBuilder.append("\n")
+                NodeType.data -> {}
                 NodeType.element -> stringBuilder.append(spaces(realDepth)).append("}\n")
 
                 else -> throw IllegalStateException()
