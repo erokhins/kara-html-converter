@@ -32,4 +32,31 @@ fun main(args : Array<String>) {
         </body>
     </html>
             """, 0));
+
+    println(KaraHTMLConverter.converter(
+            """
+    <p>
+        <small>This line of text is meant to be treated as fine print.</small>
+    </p>
+
+    <strong>rendered as bold text</strong>
+
+        <p class="text-left">Left aligned text.</p>
+    <p class="text-center">Center aligned text.</p>
+    <p class="text-right">Right aligned text.</p>
+
+
+    <form>
+    <fieldset>
+    <legend>Legend</legend>
+    <label>Label name</label>
+    <input type="text" placeholder="Type something…">
+    <span class="help-block">Example block-level help text here.</span>
+    <label class="checkbox">
+    <input type="checkbox"> Check me out
+    </label>
+    <button type="submit" class="btn">Submit</button>
+    </fieldset>
+    </form>
+            """, 0));
 }

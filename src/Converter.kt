@@ -36,10 +36,21 @@ object KaraHTMLConverter {
         }
     }
 
+    private fun hasBodyTag(htmlText : String): Boolean {
+        return htmlText.contains("<body")
+    }
+
     fun converter(htmlText : String, startDepth : Int = 0): String {
         val str = StringBuilder()
-        val doc = Jsoup.parse(htmlText)
-        NodeTraversor(KaraConvertNodeVisitor(str, startDepth - 1)).traverse(doc)         // -1 because root node is #document
+        if (hasBodyTag(htmlText)) {
+            val doc = Jsoup.parse(htmlText)
+            NodeTraversor(KaraConvertNodeVisitor(str, startDepth - 1)).traverse(doc)         // -1 because root node is #document
+        } else {
+            val doc = Jsoup.parseBodyFragment(htmlText)
+            for (element in doc!!.body()!!.childNodes()!!) {
+                NodeTraversor(KaraConvertNodeVisitor(str, startDepth)).traverse(element)
+            }
+        }
         return str.toString()
     }
 
