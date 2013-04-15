@@ -35,7 +35,7 @@ fun Node.getType(): NodeType {
 }
 
 public object KaraHTMLConverter {
-    val DEPTH_SPACE_COUNT = 3
+    val DEPTH_SPACE_COUNT = 4
     val HTML_BODY_PATTERN = Pattern.compile("(<body[ >])", Pattern.CASE_INSENSITIVE)
 
     public fun converter(htmlText : String, startDepth : Int = 0): String {
