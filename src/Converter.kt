@@ -11,8 +11,30 @@ import org.jsoup.select.NodeTraversor
 import org.jsoup.nodes.Attributes
 
 
+
 object KaraHTMLConverter {
     val DEPTH_SPACE_COUNT = 3
+
+    enum class NodeType {
+        document
+        doctype
+        text
+        comment
+        data
+        element
+    }
+
+    private fun getNodeType(node : Node): NodeType {
+        val name = node.nodeName()!!
+        when {
+            name.equals("#document") -> return NodeType.document
+            name.equals("#doctype") -> return NodeType.doctype
+            name.equals("#text") -> return NodeType.text
+            name.equals("#comment") -> return NodeType.comment
+            name.equals("#data") -> return NodeType.data
+            else -> return NodeType.element
+        }
+    }
 
     fun converter(htmlText : String, startDepth : Int = 0): String {
         val str = StringBuilder()
@@ -73,12 +95,40 @@ object KaraHTMLConverter {
     class KaraConvertNodeVisitor(val stringBuilder : StringBuilder, val startDepth : Int) : NodeVisitor {
 
         public override fun head(node: Node?, depth: Int) {
-            stringBuilder.append(spaces(depth + startDepth) + node!!.nodeName() + "(" +
-            attributesConverter(node.attributes()!!) + ") {\n")
+            val realDepth = depth + startDepth
+            when (getNodeType(node!!)) {
+                NodeType.document, NodeType.doctype -> {}
+                NodeType.text -> stringBuilder.append(textConverter(node.attr("text")!!, realDepth))
+
+                NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("/*\n")
+                        .append(textConverter(node.attr("comment")!!, realDepth))
+
+                NodeType.data -> stringBuilder.append(textConverter(node.attr("data")!!, realDepth))
+
+                NodeType.element -> {
+                    stringBuilder.append(spaces(realDepth)).append(node.nodeName())
+                    val attrStr = attributesConverter(node.attributes()!!)
+                    if (!attrStr.isEmpty()) stringBuilder.append('(').append(attrStr).append(')')
+                    stringBuilder.append(" {\n")
+                }
+
+                else -> throw IllegalStateException()
+            }
         }
 
         public override fun tail(node: Node?, depth: Int) {
-            stringBuilder.append(spaces(depth + startDepth) + "}\n")
+            val realDepth = depth + startDepth
+            when (getNodeType(node!!)) {
+                NodeType.document, NodeType.doctype -> {}
+                NodeType.text -> stringBuilder.append("\n")
+
+                NodeType.comment -> stringBuilder.append(spaces(realDepth)).append("\n*/\n")
+
+                NodeType.data -> stringBuilder.append("\n")
+                NodeType.element -> stringBuilder.append(spaces(realDepth)).append("}\n")
+
+                else -> throw IllegalStateException()
+            }
         }
     }
 
