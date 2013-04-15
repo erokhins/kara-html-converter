@@ -10,6 +10,9 @@ import org.jsoup.Jsoup
 import org.jsoup.select.NodeTraversor
 import kara.converter.NodeType.*
 import org.jsoup.nodes.Attributes
+import java.util.Collections
+import java.util.ArrayList
+import java.util.regex.Pattern
 
 enum class NodeType {
     document
@@ -20,31 +23,27 @@ enum class NodeType {
     element
 }
 
+fun Node.getType(): NodeType {
+    return when (nodeName()) {
+        "#document" -> document
+        "#doctype" -> doctype
+        "#text" -> text
+        "#comment" -> comment
+        "#data" -> data
+        else -> element
+    }
+}
+
 public object KaraHTMLConverter {
     val DEPTH_SPACE_COUNT = 3
-
-
-
-    private fun getNodeType(node : Node): NodeType {
-        return when (node.nodeName()) {
-            "#document" -> document
-            "#doctype" -> doctype
-            "#text" -> text
-            "#comment" -> comment
-            "#data" -> data
-            else -> element
-        }
-    }
-
-    private fun hasBodyTag(htmlText : String): Boolean {
-        return htmlText.contains("<body ")
-    }
+    val HTML_BODY_PATTERN = Pattern.compile("(<body[ >])", Pattern.CASE_INSENSITIVE)
 
     public fun converter(htmlText : String, startDepth : Int = 0): String {
         val str = StringBuilder()
         if (hasBodyTag(htmlText)) {
             val doc = Jsoup.parse(htmlText)
-            NodeTraversor(KaraConvertNodeVisitor(str, startDepth - 1)).traverse(doc)         // -1 because root node is #document
+            NodeTraversor(KaraConvertNodeVisitor(str, startDepth)).traverse(doc!!.head())
+            NodeTraversor(KaraConvertNodeVisitor(str, startDepth)).traverse(doc.body())
         } else {
             val doc = Jsoup.parseBodyFragment(htmlText)
             for (element in doc!!.body()!!.childNodes()!!) {
@@ -54,77 +53,45 @@ public object KaraHTMLConverter {
         return str.toString()
     }
 
-
-    private fun styleClassConvert(styleClass : String): String {
-        return styleClass.replace('-', '_')
-    }
-
-    /**
-        styleAttr = "main1 btn-info"
-        @return  main1 + btn_info
-    */
-    fun styleClasses(styleAttr : String): String {
-        val classes = styleAttr.split(' ')
-        val str = StringBuilder()
-        for (styleClass in classes) {
-            if (str.length() != 0) {
-                str.append(" + ")
-            }
-            str.append(styleClassConvert(styleClass))
-        }
-
-        return str.toString()
+    private fun hasBodyTag(htmlText : String): Boolean {
+        return HTML_BODY_PATTERN.matcher(htmlText).find()
     }
 
     private fun spaces(depth : Int) : String {
         return " ".repeat(depth * DEPTH_SPACE_COUNT)
     }
 
-    private fun dataConverter(text : String, depth :  Int): String {
+    private fun getTrimLines(text : String): List<String> {
         val trimText = text.trim()
-        if (trimText.isEmpty()) return ""
+        if (trimText.isEmpty()) return Collections.emptyList()
 
-        val lines = trimText.split('\n')
+        val lines = ArrayList<String>()
+        for (line in trimText.split('\n')) {
+            lines.add(line.trim())
+        }
+        return lines
+    }
+
+    private fun dataConverter(text : String, depth :  Int): String {
         val str = StringBuilder()
-        for (line in lines) {
-            str.append(spaces(depth)).append(line.trim()).append('\n')
+        for (line in getTrimLines(text)) {
+            str.append(spaces(depth)).append(line).append('\n')
         }
         return str.toString()
     }
 
     private fun textConverter(text : String, depth :  Int): String {
-        val trimText = text.trim()
-        if (trimText.isEmpty()) return ""
-
-        val lines = trimText.split('\n')
         val str = StringBuilder()
-        for (line in lines) {
-            str.append(spaces(depth)).append("+\"").append(line.trim()).append("\"\n")
+        for (line in getTrimLines(text)) {
+            str.append(spaces(depth)).append("+\"").append(line).append("\"\n")
         }
         return str.toString()
     }
-
-    private fun attributesConverter(attributes : Attributes): String {
-        val str = StringBuilder()
-        for (attr in attributes.asList()!!) {
-            if (str.length() > 0) {
-                str.append(", ")
-            }
-            if (attr.getKey().equals("class")) {
-                str.append("c = ").append(styleClasses(attr.getValue()))
-                continue
-            }
-            str.append(attr.getKey()).append(" = \"").append(attr.getValue()).append("\"")
-        }
-        return str.toString()
-    }
-
 
     private class KaraConvertNodeVisitor(val stringBuilder : StringBuilder, val startDepth : Int) : NodeVisitor {
-
         public override fun head(node: Node?, depth: Int) {
             val realDepth = depth + startDepth
-            when (getNodeType(node!!)) {
+            when (node!!.getType()) {
                 document, doctype -> {}
                 text -> {
                     val convertedText = textConverter(node.attr("text")!!, realDepth)
@@ -139,7 +106,7 @@ public object KaraHTMLConverter {
 
                 element -> {
                     stringBuilder.append(spaces(realDepth)).append(node.nodeName())
-                    val attrStr = attributesConverter(node.attributes()!!)
+                    val attrStr = KaraAttributeConverter.attributesConverter(node.attributes()!!)
                     if (!attrStr.isEmpty()) stringBuilder.append('(').append(attrStr).append(')')
 
                     if (node.childNodeSize() != 0) {
@@ -155,7 +122,7 @@ public object KaraHTMLConverter {
 
         public override fun tail(node: Node?, depth: Int) {
             val realDepth = depth + startDepth
-            when (getNodeType(node!!)) {
+            when (node!!.getType()) {
                 document, doctype -> {}
                 text -> {}
                 comment -> stringBuilder.append(spaces(realDepth)).append("*/\n")
